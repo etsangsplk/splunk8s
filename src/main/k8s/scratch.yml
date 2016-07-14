@@ -1,0 +1,51 @@
+## YAML Template.
+---
+
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: splunk-shc-mbr-pod
+  labels:
+    app: splunk-shc-mbr-pod
+spec:
+  containers:  
+    #splunk  SHC member
+    - 
+      args:
+        - shc-mbr
+      env:
+        - name: SPLUNK_START_ARGS
+          value: '--accept-license'         
+       # - name: SPLUNK_CMD_0
+       #   value: 'set servername captain'
+       # - name: SPLUNK_CMD_1
+       #   value: 'init shcluster-config -auth admin:changeme -mgmt_uri http://splunk-shc-cap-svc:8089 -replication_port 34570 -replication_factor 3 -shcluster_label shcluster-01'       
+      image: 'ghendrey/splunk'
+      name: shc
+   
+      ports:
+      - 
+       containerPort: 8089
+       name: rest
+      -
+       containerPort: 34570
+       name: repl
+    
+    #include a local kubectl setup as a proxy to the main api server     
+    - 
+     image: 'gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty'
+     name: 'kubectl-local'
+     imagePullPolicy: Always
+     args:
+     - proxy
+     - "--port=8001"
+    #include a local busybox so we can exec commands on it for testing   
+    - 
+     image: gcr.io/google_containers/busybox
+     name: splunk-busybox
+     command:
+         - sh
+         - -c
+         - sleep 3600 
