@@ -138,14 +138,12 @@ EOF
         echo "executing single command"
         sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk ${SPLUNK_CMD_THEN_RESTART}"
         sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk restart"
-        sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk start"
     fi
     for n in {0..29}; do
       if [[ -n $(eval echo \$\{SPLUNK_CMD_THEN_RESTART_${n}\}) ]]; then
         echo "executing command SPLUNK_CMD_THEN_RESTART_${n}"
         sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk $(eval echo \$\{SPLUNK_CMD_THEN_RESTART_${n}\})"
         sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk restart"
-        sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk start"
       else
         # We do not want to iterate all, if one in the sequence is not set
         break

@@ -1,45 +1,5 @@
-FROM buildpack-deps:sid-curl
-# A few problems with compiling Java from source:
-#  1. Oracle.  Licensing prevents us from redistributing the official JDK.
-#  2. Compiling OpenJDK also requires the JDK to be installed, and it gets
-#       really hairy.
-
-#Splunk needs ps, so I added procps to what java installs
-RUN apt-get update && apt-get install -y --no-install-recommends \
-		bzip2 \
-		unzip \
-		xz-utils \
-                procps \
-	&& rm -rf /var/lib/apt/lists/*
-
-RUN echo 'deb http://httpredir.debian.org/debian experimental main' > /etc/apt/sources.list.d/experimental.list
-
-# Default to UTF-8 file.encoding
-ENV LANG C.UTF-8
-
-# add a simple script that can auto-detect the appropriate JAVA_HOME value
-# based on whether the JDK or only the JRE is installed
-RUN { \
-		echo '#!/bin/sh'; \
-		echo 'set -e'; \
-		echo; \
-		echo 'dirname "$(dirname "$(readlink -f "$(which javac || which java)")")"'; \
-	} > /usr/local/bin/docker-java-home \
-	&& chmod +x /usr/local/bin/docker-java-home
-
-ENV JAVA_HOME /usr/lib/jvm/java-9-openjdk-amd64
-
-ENV JAVA_VERSION 9~b124
-ENV JAVA_DEBIAN_VERSION 9~b124-1
-
-RUN set -x \
-	&& apt-get update \
-	&& apt-get install -y \
-		openjdk-9-jre-headless="$JAVA_DEBIAN_VERSION" \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& [ "$JAVA_HOME" = "$(docker-java-home)" ]
-
-
+#FROM buildpack-deps:sid-curl
+FROM phusion/baseimage:latest
 ENV SPLUNK_PRODUCT splunk
 ENV SPLUNK_VERSION 6.4.1
 ENV SPLUNK_BUILD debde650d26e
@@ -94,4 +54,40 @@ VOLUME [ "/opt/splunk/etc", "/opt/splunk/var" ]
 ADD https://dl.dropboxusercontent.com/u/12104474/kubclient-1.0-SNAPSHOT.jar //
 
 #wrapper program
-ENTRYPOINT ["java", "-Xmx1024m", "-jar", "/kubclient-1.0-SNAPSHOT.jar"]
+#ENTRYPOINT ["java", "-Xmx1024m", "-jar", "/kubclient-1.0-SNAPSHOT.jar"]
+#ENTRYPOINT ["java", "-Xmx1024m", "-cp", "/kubclient-1.0-SNAPSHOT.jar", "com.splunk.kubclient.Test"]
+#ENTRYPOINT ["/bin/bash", "-c", 'while true; sleep 1; done']
+#ENTRYPOINT ["java", "-Xmx1024m", "-cp", "/kubclient-1.0-SNAPSHOT.jar", "com.splunk.kubclient.Test"]
+#ENTRYPOINT ["/bin/bash", "-c", 'set -e && java -jar /kubclient-1.0-SNAPSHOT.jar'] #yes, those MUST be single quotes around the argument to -c
+
+
+#DO NOT INSTALL JAVA BEFORE SPLUNK. For some reason "apt-get purge -y --auto-remove wget" in the 
+#splunk installation is messing with the previously installed java installation So install java
+#after splunk
+RUN \
+  echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
+  add-apt-repository -y ppa:webupd8team/java && \
+  apt-get update && \
+  apt-get install -y oracle-java8-installer && \
+  rm -rf /var/lib/apt/lists/* && \
+  rm -rf /var/cache/oracle-jdk8-installer
+
+# Define commonly used JAVA_HOME variable
+ENV JAVA_HOME /usr/lib/jvm/java-8-oracle
+
+RUN rm -rf /etc/service/sshd /etc/my_init.d/00_regen_ssh_host_keys.sh
+
+#Splunk needs ps, so I added procps to what java installs
+#Also need pstack for SPLUNK_RUN_PSTACK_ON_SHUTDOWN_HANG
+RUN apt-get update && apt-get install -y --no-install-recommends \
+		bzip2 \
+		unzip \
+		xz-utils \
+                procps \
+                pstack \ 
+	&& rm -rf /var/lib/apt/lists/*
+
+
+# Use baseimage-docker's init system.
+CMD ["/sbin/my_init"]
+ADD run.sh /etc/my_init.d/run.sh
