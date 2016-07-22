@@ -8,8 +8,8 @@ import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.dsl.LogWatch;
 import java.io.IOException;
+import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,82 +19,115 @@ import org.slf4j.LoggerFactory;
  */
 public class SHCCaptainLauncher {
 
+	private static final String DEFAULT_K8S_MASTER = "http://localhost:8001";
+
 	private static final Logger logger = LoggerFactory.getLogger(
 			SHCCaptainLauncher.class);
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws Exception {
 		if (args.length < 2) {
 			System.out.println(
 					"Usage: shcmember_podname numPodsExpected [master] [namespace] [timeout-secs]");
 			System.exit(1);
 		}
-		String podName = args[0];
+		String shcMemberPodname = args[0];
+		System.out.println(
+				"kubernetes splunk shc member pods expected name is: " + shcMemberPodname);
 		int expectedNumPods = Integer.parseInt(args[1]);
 		String namespace = "default";
-		String master = "http://localhost:8080/";
+		String master = DEFAULT_K8S_MASTER;
 		long timeout = Long.MAX_VALUE;
 		if (args.length > 2) {
 			master = args[2];
 		}
+		System.out.println("kubernetes master should be at: " + master);
 
 		if (args.length > 3) {
 			namespace = args[3];
 		}
+		System.out.
+				println("expecting to use kubernetes namespace: " + namespace);
 		if (args.length > 4) {
 			timeout = Long.parseLong(args[4]);
 		}
+		System.out.println(
+				"using timeout for members to come up (sec): " + timeout);
 
 		//initialize search head clustering on this member
-		SHCMemberLauncher.main(new String[]{});
+		System.out.println("Setting up as member...");
+		//the 'false' in run means do not tail the logs, rather return 
+		//so we can go on to our other business
+		SHCMemberLauncher.run(false, new String[]{});
+		System.out.println("Bootstrapping as captain...");
 
 		//bootstrap the captain
 		long start = System.currentTimeMillis();
 		Config config = new ConfigBuilder().withMasterUrl(master).build();
-		StringBuilder serverList = new StringBuilder();
+
 		//get member list
-		try (KubernetesClient client = new DefaultKubernetesClient(config)) {
+		try (KubernetesClient client = new DefaultKubernetesClient();) {
 			while (true) {
 				if ((System.currentTimeMillis() - start) / 1000 > timeout) {
 					logger.warn("exiting due to timeout:" + timeout + " secs");
 					System.exit(1);
 				}
+
+				System.out.println("Asking kubernetes for pod list...");
 				PodList pl = client.pods().list();
-				if (pl.getItems().size() >= expectedNumPods) {
+				//wait until there are at least as many pods as expected
+				if (pl.getItems().size() < expectedNumPods) {
+					System.out.print(".");
+					Thread.sleep(1000);
+					continue;
+				}
+				StringBuilder serverList = new StringBuilder();
 
-					pl.getItems().forEach(pod -> {
-
+				pl.getItems().forEach(pod -> {
+					//only pay attention to pods that are shc members
+					if (pod.getMetadata().getName().equals(shcMemberPodname)) {
 						serverList.append("http://").append(
 								pod.getStatus().getPodIP()
 						).append(":8092").append(",");
 					}
-					);
-					//blow away trailing commna
-					serverList.deleteCharAt(serverList.length() - 1);
-					System.out.print(serverList);
-					//String[] cmdArrray = {"/sbin/entrpoint.sh"};
-					//String[] envp = {"SPLUNK_CMD_0=bootstrap shcluster-captain -servers_list \""+serverList+"\" -auth admin:changeme"};
-					//Process p = Runtime.getRuntime().exec(cmdArrray, envp);
-
-					ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh");
-					pb.environment().put("SPLUNK_CMD_0",
-							"bootstrap shcluster-captain -servers_list \""+serverList+"\" -auth admin:changeme");
-					//Process p = Runtime.getRuntime().exec(cmdArrray, envp);
-					pb.inheritIO();
-					Process p = pb.start();
-					if (0 != p.exitValue()) {
-						throw new RuntimeException(
-								"failed to bootstrap shc captain:" + p);
-					}
-
-					//					
-					//Runtime.getRuntime().exec(podName)
-					System.exit(0); //OK
 				}
-				Thread.sleep(5 * 1000);
+				);
+				//blow away trailing commna
+				serverList.deleteCharAt(serverList.length() - 1);
+				System.out.println(
+						"these pods are non-captain shc members: " + serverList);
+
+				ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh");
+				String bootstrapCMD = "bootstrap shcluster-captain -servers_list \"" + serverList + "\" -auth admin:changeme";
+				System.out.println(bootstrapCMD);
+				pb.environment().put("SPLUNK_CMD_0", bootstrapCMD);
+				pb.inheritIO();
+				Process p = pb.start();
+				p.waitFor();
+				if (0 != p.exitValue()) {
+					throw new RuntimeException(
+							"failed to bootstrap shc captain:" + p);
+				}
+				System.out.
+						println("Succeeded in bootstrapping cluster captain.");
+				break;
+
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println(
+					"An Exception was caught while trying to get list of SHC member pods from kubernetes master. " + e.
+					getMessage());
 			logger.error(e.getMessage(), e);
-			System.exit(1);
 		}
+
+		//ok. so now the captain is bootstrapped. Let's start splunk
+		System.out.println("starting splunk SHC captain...");
+		ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh",
+				"start-service");
+		pb.environment().put("TAIL", "true");
+		pb.inheritIO();
+		Process p = pb.start();
+		p.waitFor();
+
 	}
 }

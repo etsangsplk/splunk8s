@@ -5,10 +5,10 @@ metadata:
 spec:
   ports:
   - port: 8089
-    targetPort: rest
+    targetPort: 8089
     name: rest
   - port: 34570
-    targetPort: repl
+    targetPort: 34570
     name: repl
   selector:
     app: splunk-shc-cap-pod
@@ -23,16 +23,21 @@ spec:
   containers:  
     #splunk SHC captain 
     - 
+      command:
+          - "/sbin/my_init"
       args:
-        - shc-cap
+        - "--"  
+        - java 
+        - -jar 
+        - /kubclient-1.0-SNAPSHOT.jar 
+        - shc-cap 
+        - splunk-shc-mbr-pod 
+        - "4"
+        - "http://localhost:8001"
       env:
         - name: SPLUNK_START_ARGS
           value: '--accept-license'         
-       # - name: SPLUNK_CMD_0
-       #   value: 'set servername captain'
-       # - name: SPLUNK_CMD_1
-       #   value: 'init shcluster-config -auth admin:changeme -mgmt_uri http://splunk-shc-cap-svc:8089 -replication_port 34570 -replication_factor 3 -shcluster_label shcluster-01'       
-      image: 'ghendrey/splunk'
+      image: 'ghendrey/splunk:latest'
       name: shc
    
       ports:
@@ -70,16 +75,18 @@ spec:
   containers:  
     #splunk  SHC member
     - 
+      command:
+          - "/sbin/my_init"    
       args:
+        - "--"  
+        - java 
+        - -jar 
+        - /kubclient-1.0-SNAPSHOT.jar 
         - shc-mbr
       env:
         - name: SPLUNK_START_ARGS
           value: '--accept-license'         
-       # - name: SPLUNK_CMD_0
-       #   value: 'set servername captain'
-       # - name: SPLUNK_CMD_1
-       #   value: 'init shcluster-config -auth admin:changeme -mgmt_uri http://splunk-shc-cap-svc:8089 -replication_port 34570 -replication_factor 3 -shcluster_label shcluster-01'       
-      image: 'ghendrey/splunk'
+      image: 'ghendrey/splunk:latest'
       name: shc
    
       ports:

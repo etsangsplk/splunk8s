@@ -40,8 +40,6 @@ RUN apt-get install -y wget sudo \
     && chown -R ${SPLUNK_USER}:${SPLUNK_GROUP} ${SPLUNK_BACKUP_DEFAULT_ETC} \
     && rm -rf /var/lib/apt/lists/*
 
-COPY entrypoint.sh /sbin/entrypoint.sh
-RUN chmod +x /sbin/entrypoint.sh
 
 # Ports Splunk Web, Splunk Daemon, KVStore, Splunk Indexing Port, Network Input, HTTP Event Collector
 EXPOSE 8000/tcp 8089/tcp 8191/tcp 9997/tcp 1514 8088/tcp
@@ -50,8 +48,6 @@ WORKDIR /opt/splunk
 
 # Configurations folder, var folder for everyting (indexes, logs, kvstore)
 VOLUME [ "/opt/splunk/etc", "/opt/splunk/var" ]
-
-ADD https://dl.dropboxusercontent.com/u/12104474/kubclient-1.0-SNAPSHOT.jar //
 
 #wrapper program
 #ENTRYPOINT ["java", "-Xmx1024m", "-jar", "/kubclient-1.0-SNAPSHOT.jar"]
@@ -90,4 +86,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Use baseimage-docker's init system.
 CMD ["/sbin/my_init"]
-ADD run.sh /etc/my_init.d/run.sh
+#ADD run.sh /etc/my_init.d/run.sh
+
+ADD https://dl.dropboxusercontent.com/u/12104474/kubclient-1.0-SNAPSHOT.jar //
+
+COPY entrypoint.sh /sbin/entrypoint.sh
+RUN chmod +x /sbin/entrypoint.sh
