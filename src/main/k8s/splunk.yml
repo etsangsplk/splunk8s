@@ -66,52 +66,60 @@ spec:
          - sleep 3600
 ---
 apiVersion: v1
-kind: Pod
+kind: ReplicationController
 metadata:
   name: splunk-shc-mbr-pod
   labels:
     app: splunk-shc-mbr-pod
 spec:
-  containers:  
-    #splunk  SHC member
-    - 
-      command:
-          - "/sbin/my_init"    
-      args:
-        - "--"  
-        - java 
-        - -jar 
-        - /kubclient-1.0-SNAPSHOT.jar 
-        - shc-mbr
-      env:
-        - name: SPLUNK_START_ARGS
-          value: '--accept-license'         
-      image: 'ghendrey/splunk:latest'
-      name: shc
-   
-      ports:
-      - 
-       containerPort: 8089
-       name: rest
-      -
-       containerPort: 34570
-       name: repl
-    
-    #include a local kubectl setup as a proxy to the main api server     
-    - 
-     image: 'gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty'
-     name: 'kubectl-local'
-     imagePullPolicy: Always
-     args:
-     - proxy
-     - "--port=8001"
-    #include a local busybox so we can exec commands on it for testing   
-    - 
-     image: gcr.io/google_containers/busybox
-     name: splunk-busybox
-     command:
-         - sh
-         - -c
-         - sleep 3600         
-          
+  replicas: 4
+  selector:
+    role: splunk-shc-mbr-pod
+  template:
+       metadata:
+              labels:
+                  role: splunk-shc-mbr-pod
+       spec:
+        containers:  
+         #splunk  SHC member
+         - 
+           command:
+               - "/sbin/my_init"    
+           args:
+             - "--"  
+             - java 
+             - -jar 
+             - /kubclient-1.0-SNAPSHOT.jar 
+             - shc-mbr
+           env:
+             - name: SPLUNK_START_ARGS
+               value: '--accept-license'         
+           image: 'ghendrey/splunk:latest'
+           name: shc
+
+           ports:
+           - 
+            containerPort: 8089
+            name: rest
+           -
+            containerPort: 34570
+            name: repl
+
+         #include a local kubectl setup as a proxy to the main api server     
+         - 
+          image: 'gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty'
+          name: 'kubectl-local'
+          imagePullPolicy: Always
+          args:
+          - proxy
+          - "--port=8001"
+         #include a local busybox so we can exec commands on it for testing   
+         - 
+          image: gcr.io/google_containers/busybox
+          name: splunk-busybox
+          command:
+              - sh
+              - -c
+              - sleep 3600         
+           
         

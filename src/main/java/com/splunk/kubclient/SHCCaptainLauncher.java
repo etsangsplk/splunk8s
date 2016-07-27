@@ -11,6 +11,7 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,23 +78,26 @@ public class SHCCaptainLauncher {
 
 				System.out.println("Asking kubernetes for pod list...");
 				PodList pl = client.pods().list();
-				//wait until there are at least as many pods as expected
-				if (pl.getItems().size() < expectedNumPods) {
-					System.out.print(".");
-					Thread.sleep(1000);
-					continue;
-				}
 				StringBuilder serverList = new StringBuilder();
-
+				final AtomicInteger count = new AtomicInteger(0);
 				pl.getItems().forEach(pod -> {
 					//only pay attention to pods that are shc members
-					if (pod.getMetadata().getName().equals(shcMemberPodname)) {
+					//Names look like "splunk-shc-mbr-pod-x9394"
+					if (pod.getMetadata().getName().startsWith(shcMemberPodname)) {
+						System.out.println(pod.getMetadata().getName());
 						serverList.append("https://").append(
 								pod.getStatus().getPodIP()
 						).append(":").append(DEFAULT_SHC_MGMT_PORT).append(",");
+						count.incrementAndGet();
 					}
-				}
-				);
+				});//end forEach
+					
+				//make sure at least as many member pods as expected	
+				if (count.get() < expectedNumPods) {
+					System.out.println("Waiting...");
+					Thread.sleep(1000);
+					continue;
+				}					
 				System.out.println(
 						"these pods are non-captain shc members: " + serverList);
 				String hostIp = InetAddress.getLocalHost().getHostAddress();
