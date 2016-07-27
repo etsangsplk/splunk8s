@@ -151,13 +151,16 @@ EOF
       fi
     done
   fi
-    # Optionally tail logs (if you don't do this then the script will exit)
-    if [[ -n ${TAIL} ]]; then
-        sudo -HEu ${SPLUNK_USER} tail -n 0 -f ${SPLUNK_HOME}/var/log/splunk/splunkd_stderr.log &
-        wait
-    fi
 
-else
-  echo "this ain't the first time I've run."
-  #"$@"
+
+#else
+#  echo "executing arbitrary command"
+#  "$@"
+fi
+
+# Optionally tail logs (if you don't do this then the script will exit)
+if [[ -n ${TAIL} ]]; then
+    echo tailing ${SPLUNK_HOME}/var/log/splunk/splunkd_stderr.log 
+    sudo -HEu ${SPLUNK_USER} tail -n 0 -f ${SPLUNK_HOME}/var/log/splunk/splunkd_stderr.log &
+    wait
 fi

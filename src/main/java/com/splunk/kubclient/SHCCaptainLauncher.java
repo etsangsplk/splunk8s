@@ -23,7 +23,7 @@ public class SHCCaptainLauncher {
 
 	private static final String DEFAULT_K8S_MASTER = "http://localhost:8001";
 	private static final int DEFAULT_SHC_MGMT_PORT = 8089;
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(
 			SHCCaptainLauncher.class);
 
@@ -94,12 +94,13 @@ public class SHCCaptainLauncher {
 					}
 				}
 				);
-				//blow away trailing commna
-				//String myHostname = InetAddress.getLocalHost().getCanonicalHostName();
-				String hostIp = InetAddress.getLocalHost().getHostAddress();
-				serverList.append("https://").append(hostIp).append(":").append(DEFAULT_SHC_MGMT_PORT);
 				System.out.println(
 						"these pods are non-captain shc members: " + serverList);
+				String hostIp = InetAddress.getLocalHost().getHostAddress();
+				serverList.append("https://").append(hostIp).append(":").append(
+						DEFAULT_SHC_MGMT_PORT);
+				System.out.println(
+						"these are all members (including the captain): " + serverList);
 
 				ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh");	//, "splunk bootstrap shcluster-captain -auth admin:changeme"
 //				String cmd = "bootstrap shcluster-captain";
@@ -108,7 +109,7 @@ public class SHCCaptainLauncher {
 				//System.out.println(pb.command());
 				//pb.command().add(cmd);
 				String[] bootstrapCMD = {
-					"splunk", 
+					"splunk",
 					"bootstrap",
 					"shcluster-captain",
 					"-auth",
@@ -119,8 +120,6 @@ public class SHCCaptainLauncher {
 				System.out.println(Arrays.toString(bootstrapCMD));
 				pb.command().addAll(Arrays.asList(bootstrapCMD));
 
-				pb.environment().put("TAIL", "true");
-				
 				pb.inheritIO();
 				Process p = pb.start();
 				p.waitFor();
@@ -141,10 +140,11 @@ public class SHCCaptainLauncher {
 			logger.error(e.getMessage(), e);
 		}
 
-		//ok. so now the captain is bootstrapped. Let's start splunk
-		System.out.println("starting splunk SHC captain...");
-		ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh",
-				"start-service");
+		//ok. so now the captain is bootstrapped. And splunk is already
+		//started so let's just hang out and tail the logs. (note we 
+		//give no args to entrypoint. Just the env variable TAIL. So
+		//no command is run, we just tail splunk logs
+		ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh");
 		pb.environment().put("TAIL", "true");
 		pb.inheritIO();
 		Process p = pb.start();
