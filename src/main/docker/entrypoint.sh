@@ -4,7 +4,9 @@ set -e
 
 if [ "$1" = 'splunk' ]; then
   shift
+  echo "executing raw splunk command $@"
   sudo -HEu ${SPLUNK_USER} ${SPLUNK_HOME}/bin/splunk "$@"
+  #sudo -HEu ${SPLUNK_USER} ${SPLUNK_HOME}/bin/splunk bootstrap shcluster-captain -auth admin:changme
 elif [ "$1" = 'start-service' ]; then
   # If user changed SPLUNK_USER to root we want to change permission for SPLUNK_HOME
   if [[ "${SPLUNK_USER}:${SPLUNK_GROUP}" != "$(stat --format %U:%G ${SPLUNK_HOME})" ]]; then
@@ -60,8 +62,7 @@ EOF
 
   sudo -HEu ${SPLUNK_USER} ${SPLUNK_HOME}/bin/splunk start ${SPLUNK_START_ARGS}
   #trap "sudo -HEu ${SPLUNK_USER} ${SPLUNK_HOME}/bin/splunk stop" SIGINT SIGTERM EXIT
-
-  echo "splunk start command returned"  
+ 
   # If this is first time we start this splunk instance
   if [[ $__configured == "false" ]]; then
     echo "this is the first time Ive run." 
@@ -158,5 +159,5 @@ EOF
 
 else
   echo "this ain't the first time I've run."
-  "$@"
+  #"$@"
 fi

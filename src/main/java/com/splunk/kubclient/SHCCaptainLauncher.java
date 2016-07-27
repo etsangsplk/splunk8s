@@ -9,6 +9,8 @@ import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.util.Arrays;
 import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +22,8 @@ import org.slf4j.LoggerFactory;
 public class SHCCaptainLauncher {
 
 	private static final String DEFAULT_K8S_MASTER = "http://localhost:8001";
-
+	private static final int DEFAULT_SHC_MGMT_PORT = 8089;
+	
 	private static final Logger logger = LoggerFactory.getLogger(
 			SHCCaptainLauncher.class);
 
@@ -85,21 +88,39 @@ public class SHCCaptainLauncher {
 				pl.getItems().forEach(pod -> {
 					//only pay attention to pods that are shc members
 					if (pod.getMetadata().getName().equals(shcMemberPodname)) {
-						serverList.append("http://").append(
+						serverList.append("https://").append(
 								pod.getStatus().getPodIP()
-						).append(":8092").append(",");
+						).append(":").append(DEFAULT_SHC_MGMT_PORT).append(",");
 					}
 				}
 				);
 				//blow away trailing commna
-				serverList.deleteCharAt(serverList.length() - 1);
+				//String myHostname = InetAddress.getLocalHost().getCanonicalHostName();
+				String hostIp = InetAddress.getLocalHost().getHostAddress();
+				serverList.append("https://").append(hostIp).append(":").append(DEFAULT_SHC_MGMT_PORT);
 				System.out.println(
 						"these pods are non-captain shc members: " + serverList);
 
-				ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh");
-				String bootstrapCMD = "bootstrap shcluster-captain -servers_list \"" + serverList + "\" -auth admin:changeme";
-				System.out.println(bootstrapCMD);
-				pb.environment().put("SPLUNK_CMD_0", bootstrapCMD);
+				ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh");	//, "splunk bootstrap shcluster-captain -auth admin:changeme"
+//				String cmd = "bootstrap shcluster-captain";
+//						+ "-servers_list \"" + serverList.toString() 
+//						+ "\" -auth admin:changeme";
+				//System.out.println(pb.command());
+				//pb.command().add(cmd);
+				String[] bootstrapCMD = {
+					"splunk", 
+					"bootstrap",
+					"shcluster-captain",
+					"-auth",
+					"admin:changeme",
+					"-servers_list",
+					serverList.toString()
+				};
+				System.out.println(Arrays.toString(bootstrapCMD));
+				pb.command().addAll(Arrays.asList(bootstrapCMD));
+
+				pb.environment().put("TAIL", "true");
+				
 				pb.inheritIO();
 				Process p = pb.start();
 				p.waitFor();
@@ -115,7 +136,7 @@ public class SHCCaptainLauncher {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println(
-					"An Exception was caught while trying to get list of SHC member pods from kubernetes master. " + e.
+					"An Exception was caught while trying to bootstrap the captain. " + e.
 					getMessage());
 			logger.error(e.getMessage(), e);
 		}

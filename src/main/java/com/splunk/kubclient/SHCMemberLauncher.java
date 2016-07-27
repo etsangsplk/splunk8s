@@ -27,18 +27,20 @@ public class SHCMemberLauncher {
 	
 	private void run() throws Exception{
 		System.out.println("Starting splunk member");
-		String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+		//String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+		String hostIp = InetAddress.getLocalHost().getHostAddress();
 		ProcessBuilder pb = new ProcessBuilder("/sbin/entrypoint.sh",
 				"start-service");
-		String cmd = "init shcluster-config -auth admin:changeme -mgmt_uri http://" 
-				+ hostname + 
-				":8092 -replication_port 34570 -replication_factor 3 -shcluster_label shcluster-01";
+		String cmd = "init shcluster-config -auth admin:changeme -mgmt_uri https://" 
+				+ hostIp + 
+				":8089 -replication_port 34570 -replication_factor 2 -shcluster_label shcluster-01";
 		//String cmd = "help -auth admin:changeme ";
+		System.out.println("will execute: " + cmd);
 
 		pb.environment().put("SPLUNK_CMD_THEN_RESTART_0", cmd);
 		pb.environment().put("SPLUNK_START_ARGS", "--accept-license");
 		pb.environment().put("SPLUNK_RUN_PSTACK_ON_SHUTDOWN_HANG", "true");
-		pb.environment().put("SPLUNK_USER", "root");
+		//pb.environment().put("SPLUNK_USER", "root");
 		if(tailLogsAndWait){
 			pb.environment().put("TAIL", "true");
 		}
